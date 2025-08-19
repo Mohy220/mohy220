@@ -1,80 +1,80 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+#!/usr/bin/env python3
+"""
+Simple HTTP server for serving static files.
+Uses Python's built-in http.server module instead of custom implementation.
+"""
+
+import http.server
+import socketserver
+import os
 import urllib.parse
 
-# Serve the HTML content with a basic response
-class MyHandler(BaseHTTPRequestHandler):
+class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """Extended SimpleHTTPRequestHandler with custom routes"""
+    
     def do_GET(self):
-        # Serve the HTML page for the user
+        # Handle root path - serve Index.html
         if self.path == "/":
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-
-            with open("web/Untitled-1", "r") as file:
-                self.wfile.write(bytes(file.read(), "utf-8"))
-
-        # Serve the CSS file (if needed)
+            self.path = "/Index.html"
+        
+        # Handle legacy CSS path
         elif self.path == "/Untitled-2":
-            self.send_response(200)
-            self.send_header("Content-type", "text/css")
-            self.end_headers()
-
-            with open("web/Untitled-2", "r") as file:
-                self.wfile.write(bytes(file.read(), "utf-8"))
-
-        # Serve JS (if you decide to add interactivity later)
-        elif self.path == "/script.js":
-            self.send_response(200)
-            self.send_header("Content-type", "application/javascript")
-            self.end_headers()
-
-            with open("web/script.js", "r") as file:
-                self.wfile.write(bytes(file.read(), "utf-8"))
-
-        # Serve the Contact form results (POST request handling)
+            self.path = "/Untitled-2.css"
+        
+        # Handle contact form submission (for compatibility)
         elif self.path.startswith("/submit"):
-            # Parse form data if it's available (For contact form or other requests)
-            parsed_path = urllib.parse.urlparse(self.path)
-            parsed_query = urllib.parse.parse_qs(parsed_path.query)
+            self.handle_contact_form()
+            return
+        
+        # Use the default handler for all other requests
+        return super().do_GET()
+    
+    def handle_contact_form(self):
+        """Handle contact form submissions"""
+        parsed_path = urllib.parse.urlparse(self.path)
+        parsed_query = urllib.parse.parse_qs(parsed_path.query)
+        
+        name = parsed_query.get("name", ["Anonymous"])[0]
+        message = parsed_query.get("message", ["No message provided"])[0]
+        
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        
+        response_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Form Submitted</title>
+    <link rel="stylesheet" href="Untitled-2.css">
+</head>
+<body>
+    <div style="max-width: 800px; margin: 2rem auto; padding: 2rem; text-align: center;">
+        <h1>Thank You, {name}!</h1>
+        <p>Your message has been received:</p>
+        <blockquote style="background-color: #333; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+            "{message}"
+        </blockquote>
+        <p>We will get back to you shortly!</p>
+        <a href="/" style="color: #00bfae; text-decoration: none;">Go back to home</a>
+    </div>
+</body>
+</html>"""
+        
+        self.wfile.write(bytes(response_html, "utf-8"))
 
-            name = parsed_query.get("name", ["Anonymous"])[0]
-            message = parsed_query.get("message", ["No message provided"])[0]
-
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-
-            # Here, you can craft a response based on the form data, or render a confirmation page
-            self.wfile.write(bytes(f"""
-                <html>
-                    <head>
-                        <title>Contact Form Submitted</title>
-                        <link rel="stylesheet" href="Untitled-2">
-                    </head>
-                    <body>
-                        <div class="container">
-                            <h1>Thank You, {name}!</h1>
-                            <p>Your message has been received:</p>
-                            <blockquote>"{message}"</blockquote>
-                            <p>We will get back to you shortly!</p>
-                            <a href="/">Go back to home</a>
-                        </div>
-                    </body>
-                </html>
-            """, "utf-8"))
-
-        else:
-            # If the path doesn't match any of the above, send a 404 response
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(bytes("Page not found", "utf-8"))
-
-# Setting up the server
-def run(server_class=HTTPServer, handler_class=MyHandler, port=8080):
-    server_address = ("", port)
-    httpd = server_class(server_address, handler_class)
-    print(f"Server running on port {port}")
-    httpd.serve_forever()
+def run_server(port=8080):
+    """Run the HTTP server"""
+    try:
+        with socketserver.TCPServer(("", port), CustomHTTPRequestHandler) as httpd:
+            print(f"Server running at http://localhost:{port}/")
+            print("Press Ctrl+C to stop the server")
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+    except OSError as e:
+        print(f"Error starting server: {e}")
 
 if __name__ == "__main__":
-    run()
+    run_server()
